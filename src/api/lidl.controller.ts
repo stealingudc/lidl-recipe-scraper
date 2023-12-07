@@ -11,7 +11,7 @@ import {
   FilterObjectDiscrimination,
   FilterObjectUnion,
   courses,
-  region as regions,
+  regions,
 } from 'src/lib/vendor/lidl/filter';
 
 export class CategoryFilter<T> {

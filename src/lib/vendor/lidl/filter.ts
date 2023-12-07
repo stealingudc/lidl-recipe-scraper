@@ -2,8 +2,8 @@ import { Dictionary, MapKeyType, MapValueType } from 'src/lib/utils/dictionary';
 
 export type Filter = 'course' | 'region';
 
-export type FilterObjectUnion = typeof courses | typeof region;
-export type FilterObjectDiscrimination = typeof courses & typeof region;
+export type FilterObjectUnion = typeof courses | typeof regions;
+export type FilterObjectDiscrimination = typeof courses & typeof regions;
 
 export const courses = {
   1605: 'appetizers',
@@ -15,7 +15,7 @@ export const courses = {
   1606: 'drinks',
 } as const;
 
-export const region = {
+export const regions = {
   19794: 'romanian',
   1661: 'american',
   1655: 'asian',
