@@ -26,9 +26,25 @@ export class PhantomJS {
     return await page.property(property);
   }
 
-  async getPageDocument(url: string){
+  async getPageDocument(url: string) {
     const page = await (await this.instance).createPage();
     await page.open(url);
-    return await page.evaluate(() => document);
+    return await page.evaluate(function () {
+      return document;
+    });
+  }
+
+  async getPage(url: string){
+    const page = await (await this.instance).createPage();
+    await page.open(url);
+    return page;
+  }
+
+  async evaluate<T>(url: string, callback: () => T) {
+    const page = await (await this.instance).createPage();
+    await page.open(url);
+    return await page.evaluate(function () {
+      return callback();
+    });
   }
 }
