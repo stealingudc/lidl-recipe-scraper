@@ -16,11 +16,14 @@ import {
 } from 'src/lib/vendor/lidl/filter';
 import { availableParallelism } from 'os';
 import path from 'path';
-import { Pool, Thread, Worker, spawn } from 'threads';
-import { RecipeFunctions } from 'src/lib/utils/workers/recipes';
+import { FunctionThread, Pool, Thread, Worker, spawn } from 'threads';
+import { QueuedTask } from 'threads/dist/master/pool-types';
+import { getRecipe } from 'src/lib/utils/workers/recipes';
+import { performance } from 'perf_hooks';
 
 export type Recipe = {
   name: string;
+  description: string;
   ingredients: string[];
   instructions: string[];
 };
@@ -33,6 +36,8 @@ export class CategoryFilter<T> {
   @Transform(({ value }: { value: string }) => value.split(','))
   filters: T[];
 }
+
+export type GetRecipeType = (url: string) => Promise<Recipe>;
 
 @Controller('api')
 export class LidlController {
@@ -72,6 +77,7 @@ export class LidlController {
     @Query(new ValidationPipe({ transform: true }))
     f: CategoryFilter<ObjectValueType<FilterObjectDiscrimination>>,
   ) {
+    console.log('Started working...');
     const uri_arr = [];
     const conditions: boolean[] = [false, false];
     for (const item of f.filters) {
@@ -97,12 +103,15 @@ export class LidlController {
   }
 
   private async _getHrefs(url: string) {
-    console.log('Looking for hrefs...');
-    const phantom = new PhantomJS();
+    // console.log('Looking for hrefs...');
+    const phantom = await PhantomJS.makeInstance();
     const page = await phantom.getPage(url);
-    return await page.evaluate(function () {
+    const hrefs = await page.evaluate(function () {
       // This code looks atypical since PhantomJS only supports ES5 standards.
-      var anchors = document.querySelectorAll('.mRecipeTeaser-link');
+      var container = document.querySelector(
+        '.oRecipeFeed-resultContainer.js_oRecipeFeed-resultContainer',
+      );
+      var anchors = container.querySelectorAll('.mRecipeTeaser-link');
       var hrefs: string[] = [];
       for (var i = 0; i < anchors.length; i++) {
         hrefs.push(anchors[i].getAttribute('href'));
@@ -110,45 +119,35 @@ export class LidlController {
       console.log('hrefs', hrefs);
       return hrefs;
     });
+    page.close();
+    return hrefs;
   }
 
   private async _getRecipes(hrefs: string[]) {
-    console.log(hrefs);
-    const worker_pool = Pool(
-      () => spawn<RecipeFunctions>(new Worker('../lib/utils/workers/recipes')),
-      2,
+    const worker_pool = Pool(() =>
+      spawn<GetRecipeType>(new Worker('../lib/utils/workers/recipes')),
     );
-    // const worker = await spawn<RecipeFunctions>(new Worker("../lib/utils/workers/recipes"));
-    const ret = new Promise<
-      Awaited<ReturnType<RecipeFunctions['getRecipe']>>[]
-    >(async (resolve, reject) => {
-      const recipes: Awaited<typeof ret> = [];
+    const tasks: QueuedTask<FunctionThread, Recipe>[] = [];
+    var recipes = [];
+    if (hrefs.length > 0) {
       for (const href of hrefs) {
-        worker_pool
-          .queue((worker) => worker.getRecipe(href))
-          .then((result) => recipes.push(result));
-        // recipes.push(await worker.getRecipe(this.url + href));
-        // const url = this.url + href;
-        // const phantom = new PhantomJS();
-        // const page = await phantom.getPage(url);
-        // const recipe = await page.evaluate(function () {
-        //   return JSON.parse(document.querySelector('script[class="json-ld"]').innerHTML)
-        // });
-        // const parsed: Recipe = {
-        //   name: recipe.name,
-        //   ingredients: recipe.recipeIngredient,
-        //   instructions: recipe.recipeInstructions
-        // }
-        // console.log(parsed);
-        // recipes.push(parsed);
+        const task = worker_pool.queue(async (getRecipe) => {
+          const recipe = await getRecipe(this.url + href);
+          return recipe;
+        });
+        tasks.push(task);
       }
-      if (recipes.length > 0) resolve(recipes);
-    });
-    const p = await ret
-      .then((data) => {console.log('Completed.'); return data;})
-      .catch((err) => console.error(err));
-    await worker_pool.completed();
-    await worker_pool.terminate();
-    return p;
+    }
+    recipes = [...(await Promise.all(tasks))];
+    // if (hrefs.length > 0) {
+    //   for (const href of hrefs) {
+    //     console.log(`Working on ${href}.`);
+    //     recipes.push(await getRecipe(this.url + href, phantom));
+    //   }
+    //   // await worker_pool.settled();
+    //   // await worker_pool.terminate();
+    // }
+    console.log(`Done working in ${performance.now()}ms.`)
+    return recipes;
   }
 }

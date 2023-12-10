@@ -15,33 +15,38 @@ type Property =
   | 'windowName';
 
 export class PhantomJS {
-  instance: Promise<phantom.PhantomJS>;
-  constructor() {
-    this.instance = phantom.create();
+  // instance: Promise<phantom.PhantomJS>;
+  instance: phantom.PhantomJS;
+  constructor(instance: phantom.PhantomJS) {
+    this.instance = instance;
+  }
+
+  static async makeInstance(){
+    return new PhantomJS(await phantom.create())
   }
 
   async getPageProperty<T extends Property>(url: string, property: T) {
-    const page = await (await this.instance).createPage();
+    const page = await this.instance.createPage();
     await page.open(url);
     return await page.property(property);
   }
 
   async getPageDocument(url: string) {
-    const page = await (await this.instance).createPage();
+    const page = await this.instance.createPage();
     await page.open(url);
     return await page.evaluate(function () {
       return document;
     });
   }
 
-  async getPage(url: string){
-    const page = await (await this.instance).createPage();
+  async getPage<T>(url: string){
+    const page = await this.instance.createPage();
     await page.open(url);
     return page;
   }
 
   async evaluate<T>(url: string, callback: () => T) {
-    const page = await (await this.instance).createPage();
+    const page = await this.instance.createPage();
     await page.open(url);
     return await page.evaluate(function () {
       return callback();
