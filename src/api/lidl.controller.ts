@@ -4,25 +4,19 @@ import { IsArray, IsOptional, IsString } from 'class-validator';
 import { PhantomJS } from 'src/lib/phantom/phantom';
 import {
   Dictionary,
-  MapValueType,
   ObjectValueType,
 } from 'src/lib/utils/dictionary';
 import {
   Filter,
   FilterObjectDiscrimination,
   FilterObjectUnion,
-  courses,
   filterAccessors,
   filters,
-  regions,
 } from 'src/lib/vendor/lidl/filter';
-import { availableParallelism } from 'os';
-import path from 'path';
-import { FunctionThread, Pool, Thread, Worker, spawn } from 'threads';
+import { FunctionThread, Pool, Worker, spawn } from 'threads';
 import { QueuedTask } from 'threads/dist/master/pool-types';
-import { getRecipe } from 'src/lib/utils/workers/recipes';
 import { performance } from 'perf_hooks';
-import { getRandomValue } from 'src/lib/utils/utils';
+import { ApiQuery } from '@nestjs/swagger';
 
 export type Recipe = {
   name: string;
@@ -75,6 +69,7 @@ export class LidlController {
   }
 
   //Example: http://localhost:3000/api/get?filters=breakfast,brunch
+  @ApiQuery({type: [() => (filters)]})
   @Get(':f')
   public async filters(
     @Query(new ValidationPipe({ transform: true }))
@@ -83,37 +78,10 @@ export class LidlController {
     console.log('Started working...');
     const uri_arr = [];
     var found: string = '';
-    const conditions: boolean[] = Array(filters.length).fill(false);
-    if ((f.filters as string[]).includes('random')) {
-      for (var i = 0; i < filters.length - 4; i++) {
-        found = found + '"' + filterAccessors[i] + '"' + ', ';
-        uri_arr.push(
-          this._makeFilter(
-            filterAccessors[i],
-            filters[i] as any,
-            new Set<(typeof filters)[number][keyof (typeof filters)[number]]>(
-              getRandomValue(filters[i]),
-            ),
-          ),
-        );
-        console.log(
-          this._makeFilter(
-            filterAccessors[i],
-            filters[i] as any,
-            new Set(f.filters),
-          ),
-        );
-      }
-    } else {
-      for (const item of f.filters) {
-        for (var i = 0; i < filters.length; i++) {
-          if (item in Dictionary.reverseObject(filters[i] as any)) {
-            conditions[i] = true;
-          }
-        }
-      }
-      for (var i = 0; i < conditions.length; i++) {
-        if (conditions[i]) {
+
+    for (const item of f.filters) {
+      for (var i = 0; i < filters.length; i++) {
+        if (item in Dictionary.reverseObject(filters[i] as any)) {
           found = found + '"' + filterAccessors[i] + '"' + ', ';
           uri_arr.push(
             this._makeFilter(

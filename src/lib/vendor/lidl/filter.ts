@@ -93,4 +93,12 @@ export const filters = [
   difficulty,
 ] as const;
 
-export type Filter = typeof filterAccessors[number];
+export type Filter = (typeof filterAccessors)[number];
+export interface IFilter {
+  course?: Set<MapValueType<typeof courses>>;
+  region?: Set<MapValueType<typeof regions>>;
+  food_type?: Set<MapValueType<typeof food_types>>;
+  diet?: Set<MapValueType<typeof diet>>;
+  collection?: Set<MapValueType<typeof collection>>;
+  difficulty?: Set<MapValueType<typeof difficulty>>;
+}
