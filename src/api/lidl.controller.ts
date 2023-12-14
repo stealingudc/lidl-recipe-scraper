@@ -12,6 +12,8 @@ import {
   FilterObjectDiscrimination,
   FilterObjectUnion,
   courses,
+  filterAccessors,
+  filters,
   regions,
 } from 'src/lib/vendor/lidl/filter';
 import { availableParallelism } from 'os';
@@ -20,6 +22,7 @@ import { FunctionThread, Pool, Thread, Worker, spawn } from 'threads';
 import { QueuedTask } from 'threads/dist/master/pool-types';
 import { getRecipe } from 'src/lib/utils/workers/recipes';
 import { performance } from 'perf_hooks';
+import { getRandomValue } from 'src/lib/utils/utils';
 
 export type Recipe = {
   name: string;
@@ -79,26 +82,54 @@ export class LidlController {
   ) {
     console.log('Started working...');
     const uri_arr = [];
-    const conditions: boolean[] = [false, false];
-    for (const item of f.filters) {
-      if (item in Dictionary.reverseObject(courses)) {
-        conditions[0] = true;
-      } else if (item in Dictionary.reverseObject(regions)) {
-        conditions[1] = true;
+    var found: string = '';
+    const conditions: boolean[] = Array(filters.length).fill(false);
+    if ((f.filters as string[]).includes('random')) {
+      for (var i = 0; i < filters.length - 4; i++) {
+        found = found + '"' + filterAccessors[i] + '"' + ', ';
+        uri_arr.push(
+          this._makeFilter(
+            filterAccessors[i],
+            filters[i] as any,
+            new Set<(typeof filters)[number][keyof (typeof filters)[number]]>(
+              getRandomValue(filters[i]),
+            ),
+          ),
+        );
+        console.log(
+          this._makeFilter(
+            filterAccessors[i],
+            filters[i] as any,
+            new Set(f.filters),
+          ),
+        );
+      }
+    } else {
+      for (const item of f.filters) {
+        for (var i = 0; i < filters.length; i++) {
+          if (item in Dictionary.reverseObject(filters[i] as any)) {
+            conditions[i] = true;
+          }
+        }
+      }
+      for (var i = 0; i < conditions.length; i++) {
+        if (conditions[i]) {
+          found = found + '"' + filterAccessors[i] + '"' + ', ';
+          uri_arr.push(
+            this._makeFilter(
+              filterAccessors[i],
+              filters[i] as any,
+              new Set(f.filters),
+            ),
+          );
+        }
       }
     }
-    if (conditions[0]) {
-      uri_arr.push(
-        this._makeFilter('course', courses as any, new Set(f.filters)),
-      );
-    }
-    if (conditions[1]) {
-      uri_arr.push(
-        this._makeFilter('region', regions as any, new Set(f.filters)),
-      );
-    }
+
+    console.log(`Found filters: ${found.slice(0, found.length - 2)}.`);
     const url = this.url + this._consolidateFilters(uri_arr);
     const hrefs = await this._getHrefs(url);
+    console.log(`Found ${hrefs.length} recipes.`);
     return await this._getRecipes(hrefs);
   }
 
@@ -139,15 +170,7 @@ export class LidlController {
       }
     }
     recipes = [...(await Promise.all(tasks))];
-    // if (hrefs.length > 0) {
-    //   for (const href of hrefs) {
-    //     console.log(`Working on ${href}.`);
-    //     recipes.push(await getRecipe(this.url + href, phantom));
-    //   }
-    //   // await worker_pool.settled();
-    //   // await worker_pool.terminate();
-    // }
-    console.log(`Done working in ${performance.now()}ms.`)
+    console.log(`Done working in ${performance.now()}ms.`);
     return recipes;
   }
 }

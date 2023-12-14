@@ -7,7 +7,7 @@ const ph = (async () => await PhantomJS.makeInstance())();
 export async function getRecipe(url: string) {
   try {
     const phantom = await ph;
-    // console.log('Started getting recipes');
+    console.log(`Getting "${url}"...`);
     const page = await phantom.getPage(url);
     await page.setting(
       'userAgent',
@@ -37,7 +37,7 @@ export async function getRecipe(url: string) {
           name: object.name,
           description: object.description,
           ingredients: object.recipeIngredient,
-          instructions: object.recipeInstructions,
+          instructions: JSON.stringify(object.recipeInstructions).replaceAll("\\n", " "),
         }
       : {};
   } catch (err) {
